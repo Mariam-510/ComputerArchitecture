@@ -1,0 +1,412 @@
+//we use three multiplexer 2x1, three multiplexer 4x1, three full adder, three not gates
+//half adder using structural descriptions 
+module half_adder(output sum,output carry,input a,input b);
+   xor(sum, a, b);
+   and(carry, a, b);
+endmodule
+//full adder using structural descriptions 
+module full_adder(output s,output carry,input x,input y,input z);
+   wire s1, c1, c2;
+   half_adder h1(s1, c1, x, y);
+   half_adder h2(s, c2, s1, z);
+   or(carry, c1, c2);
+endmodule
+//multiplexer 2x1 using structural descriptions 
+module multiplexer_2_1(output Y,input I0,input I1,input S);
+   wire S_Dash,a,b;
+   not(S_Dash,S);
+   and(a,I0,S_Dash);
+   and(b,I1,S);
+   or(Y,a,b);
+endmodule
+//multiplexer 4x1 using structural descriptions 
+module multiplexer_4_1(output Y,input I0,input I1,input I2,input I3,input S0,input S1);
+   wire S0_Dash,S1_Dash,a,b,c,d;
+   not(S0_Dash,S0);
+   not(S1_Dash,S1);
+   and(a,I0,S0_Dash,S1_Dash);
+   and(b,I1,S0,S1_Dash);
+   and(c,I2,S0_Dash,S1);
+   and(d,I3,S0,S1);
+   or(Y,a,b,c,d);
+endmodule
+/*
+2 selection inputs and 2 signed integers in 2's complement form A 3-bits and B 3-bits
+output G 3-bits, it is signed integer in 2's complement from
+G=A-1 when the selection inputs are 00
+G=A+B when the selection inputs are 01
+G=A-B when the selection inputs are 10
+G=-B when the selection inputs are 11
+circuit using structural descriptions 
+*/
+module circuit(output signed [2:0]G,output C,input S0,input S1,input signed [2:0]A,input signed [2:0]B);
+   //wire using inside the circuit
+   wire C1_out,C2_out,B_Dash[2:0],out_2_1[2:0],out_4_1[2:0];
+   reg signed [2:0]x=-1;//logic 1
+   reg [2:0]y=0;//logic 0
+   //not B gate
+   not(B_Dash[0],B[0]);
+   not(B_Dash[1],B[1]);
+   not(B_Dash[2],B[2]);
+   //multiplexer 2x1 inputs A,B-dach & selection S1 & output out_2_1
+   multiplexer_2_1 m0_2_1(out_2_1[0],A[0],B_Dash[0],S1);
+   //multiplexer 4x1 inputs 0,B,B-dach,1 & selection S0,S1 & output out_4_1
+   multiplexer_4_1 m0_4_1(out_4_1[0],x[0],B[0],A[0],y[0],S0,S1);
+   //full adder inputs out_2_1,out_4_1,S1 as Cin & output G and C1out
+   full_adder f0(G[0],C1out,out_2_1[0],out_4_1[0],S1);
+   multiplexer_2_1 m1_2_1(out_2_1[1],A[1],B_Dash[1],S1);
+   multiplexer_4_1 m1_4_1(out_4_1[1],x[1],B[1],A[1],y[1],S0,S1);
+   //full adder inputs out_2_1,out_4_1,C1out as Cin & output G and C2out
+   full_adder f1(G[1],C2out,out_2_1[1],out_4_1[1],C1out);
+   multiplexer_2_1 m2_2_1(out_2_1[2],A[2],B_Dash[2],S1);
+   multiplexer_4_1 m2_4_1(out_4_1[2],x[2],B[2],A[2],y[2],S0,S1);
+   //full adder inputs out_2_1,out_4_1,C2out as Cin & output G and C3out
+   full_adder f2(G[2],C,out_2_1[2],out_4_1[2],C2out);
+endmodule
+//test banch using behavioral descriptions 
+module circuit_test();
+   reg s0,s1;//selection inputs
+   wire signed[2:0]out;//signed 3-bits output
+   wire c;//overflow carry
+   reg [2:0]a;//3bit input a
+   reg [2:0]b;//3bit input b
+   circuit cir( out,c,s0,s1,a,b);//calling circuit c to pass the signed output,selection inputs(s0,s1),signed input a and b
+   reg signed [2:0] val_a; //signed input a
+   reg signed [2:0]val_b;//signed input b
+   reg [1:0] sel;//selection inputs
+   integer i;
+   initial//initial block will start at the beginning of a simulation 
+   begin
+      //to mointor and display value changes of selection inputs,input a and b,and output out
+      $monitor($time, " s1=%b, s0=%b, a=%b, b=%b, out=%b, c=%b",s1,s0,a,b,out,c);
+      /*Generally in all test cases we have inputs a[0,1,3,-2,-3,-4] and b in range[1,2,3,0,-1,-2,-3,-4]
+      we set a to val_a and b to val_b,both selections initially 00.
+      we loop on selections 1st iteration selections will be 01,2nd iteration selections will be 10,3rd iteration selections will be 11*/
+      //a=0,b=0 and change selections only[00,01,10,11]
+      val_a=0;val_b=0;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=0;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;//time scale
+      end
+      //a=0,b=1 and change selections only[00,01,10,11]
+      #10 val_a=0;val_b=1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n"); //print newline
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=0,b=3
+      #10 val_a=0;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=0,b=-2
+      #10 val_a=0;val_b=-2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=0,b=-3
+      #10 val_a=0;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=0,b=-4
+      #10 val_a=0;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=0;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=0
+      #10 val_a=1;val_b=0;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=0;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=1
+      #10 val_a=1;val_b=1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=2
+      #10 val_a=1;val_b=2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=3
+      #10 val_a=1;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=-1
+      #10 val_a=1;val_b=-1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=-1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=-2
+      #10 val_a=1;val_b=-2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=-3
+      #10 val_a=1;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=1,b=-4
+      //overflow when 10(5)
+      #10 val_a=1;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=1;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+       //a=3,b=0
+      #10 val_a=3;val_b=0;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=0;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=1
+      #10 val_a=3;val_b=1;sel=0; s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=2
+      //overflow when 01(5)
+      #10 val_a=3;val_b=2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=3
+      //overflow when 01(6)
+      #10 val_a=3;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=-1
+      #10 val_a=3;val_b=-1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=-1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=-2
+      //overflow when 10(5)
+      #10 val_a=3;val_b=-2;sel=0; s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=-3
+      //overflow when 10(6)
+      #10 val_a=3;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=3,b=-4
+      //overflow when 10(7)
+      #10 val_a=3;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=3;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=0
+      #10 val_a=-2;val_b=0;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=0;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=1
+      #10 val_a=-2;val_b=1;sel=0; s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=2
+      #10 val_a=-2;val_b=2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=3
+      //overflow when 10(-5)
+      #10 val_a=-2;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=-1
+      #10 val_a=-2;val_b=-1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=-1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=-2
+      #10 val_a=-2;val_b=-2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+      #10 val_a=-2;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=-3
+      //overflow when 01(-5)
+      #10 val_a=-2;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-2,b=-4
+      //overflow when 01(-6)
+      #10 val_a=-2;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-2;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=0
+      #10 val_a=-3;val_b=0;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=0;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=1
+      #10 val_a=-3;val_b=1;sel=0; s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=2
+      //overflow when 10(-5)
+      #10 val_a=-3;val_b=2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=3
+      //overflow when 10(-6)
+      #10 val_a=-3;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=-1
+      #10 val_a=-3;val_b=-1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=-1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=-2
+      #10 val_a=-3;val_b=-2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+      #10 val_a=-3;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=-3
+      #10 val_a=-3;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-3,b=-4
+      #10 val_a=-3;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-3;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=1
+      #10 val_a=-4;val_b=1;sel=0; s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=2
+      #10 val_a=-4;val_b=2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=3
+      #10 val_a=-4;val_b=3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=-1
+      #10 val_a=-4;val_b=-1;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display ("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=-1;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=-2
+      #10 val_a=-4;val_b=-2;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+      #10 val_a=-4;val_b=-2;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=-3
+      #10 val_a=-4;val_b=-3;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=-3;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      //a=-4,b=-4
+      #10 val_a=-4;val_b=-4;sel=0;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      $display("\n");
+      for(i=1;i<4;i=i+1)
+      begin
+         #10 val_a=-4;val_b=-4;sel=sel+1;s1=sel[1];s0=sel[0];a=val_a;b=val_b;
+      end
+      $finish;
+   end
+endmodule
